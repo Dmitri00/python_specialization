@@ -20,7 +20,7 @@ class Cmd:
     CMD_FORMAT = '{name:} {data:}\n'
     cmd_name = ''
     def check_str(self, key):
-        if isinstance(key, str) and len(str) > 0:
+        if isinstance(key, str) and len(key) > 0:
             return key
         else:
             raise CmdArgumentError()
@@ -30,6 +30,8 @@ class Cmd:
             key.index(self.KEY_DELIM)
         except ValueError:
             raise CmdArgumentError()
+        if key.count('.') > 1:
+            raise CmdArgumentError()
         server, metric = key.split(self.KEY_DELIM)
         if not server.isalnum() or not metric.isalnum():
             raise CmdArgumentError()
@@ -38,32 +40,41 @@ class Cmd:
         if isinstance(num, float) or isinstance(num, int):
             return num
         else:
-            return CmdArgumentError()
-    def check_int(self, num):
-        if isinstance(num, int):
+            raise CmdArgumentError()
+    def check_timestamp(self, num):
+        if isinstance(num, int) and num > 0:
             return num
         else:
-            return CmdArgumentError()
+            raise CmdArgumentError()
     def _str_data(self):
         return ''
     def __str__(self):
         cmd_data = self._str_data()
-        cmd_str = self.CMD_FORMAT.format(self.cmd_name, cmd_data)
+        cmd_str = self.CMD_FORMAT.format(name=self.cmd_name, data=cmd_data)
         return cmd_str
 class PutCmd(Cmd):
     cmd_name = 'put'
     def __init__(self, key, value, timestamp):
         self.key = self.check_key(key)
-        self.value = self.check_num(value)
-        self.timestamp = self.check_int(timestamp)
+        self.value = float(self.check_num(value))
+        self.timestamp = self.check_timestamp(timestamp)
     def _str_data(self):
         cmd_data = list(map(str, (self.key, self.value, self.timestamp)))
         cmd_data = ' '.join(cmd_data)
         return cmd_data
+    def __eq__(self, other):
+        if self.key != other.key:
+            return False
+        elif self.timestamp != other.timestamp:
+            return False
+        elif self.value != other.value:
+            return False
+        else:
+            return True
 
 class GetCmd(Cmd):
     cmd_name = 'get'
-    def __init__(self, key):
+    def __init__(self, key='*'):
         self.key = self.check_key(key)
     def check_key(self, key):
         if key == '*':
@@ -72,6 +83,11 @@ class GetCmd(Cmd):
             return super().check_key(key)
     def _str_data(self):
         return self.key
+    def __eq__(self, other):
+        if self.key != other.key:
+            return False
+        else:
+            return True
 class Metric:
     def __init__(self, data_line):
         data_line_splitted = data_line.split(' ')
