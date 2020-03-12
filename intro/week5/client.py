@@ -139,7 +139,9 @@ class Client:
         self.port = port
         self.timeout = timeout
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(self.timeout)
+        if timeout is not None:
+            self.sock.settimeout(self.timeout)
+        self._connect()
     def put(self, key, value, timestamp): 
         put_cmd = PutCmd(key, value, timestamp)
         with closing(self._connect()):
@@ -148,17 +150,16 @@ class Client:
         response = bytearray()
         end_symb = '\n\n'.encode()
         buf_size = 4096
-        with closing(self._connect()):
-            try:
-                self.sock.sendall(request)
-                
+        try:
+            self.sock.sendall(request)
+            
+            chunk = self.sock.recv(buf_size)
+            response.extend(chunk)
+            while chunk[-2:] != end_symb:
                 chunk = self.sock.recv(buf_size)
                 response.extend(chunk)
-                while chunk[-2:] != end_symb:
-                    chunk = self.sock.recv(buf_size)
-                    response.extend(chunk)
-            except socket.timeout:
-                raise ClientError('Exceed timeout on send')
+        except socket.timeout:
+            raise ClientError('Exceed timeout on send')
         return response
 
     def get(self, key): 
