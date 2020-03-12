@@ -1,4 +1,5 @@
 import socket
+from contextlib import closing
 """
 sock = socket.socket()
 sock.bind()
@@ -90,17 +91,21 @@ class GetCmd(Cmd):
             return True
 class Metric:
     def __init__(self, data_line):
-        data_line_splitted = data_line.split(' ')
-        if len(data_line_splitted) != 3:
+        data_line_splited = data_line.split(' ')
+        if len(data_line_splited) != 3:
             raise ResponseError()
         try:
-            self.key = str(data_line)[0]
-            self.value = float(data_line[1])
-            self.timestamp = int(data_line[2])
+            self.key = data_line_splited[0]
+            self.value = float(data_line_splited[1])
+            self.timestamp = int(data_line_splited[2])
         except ValueError:
             raise ClientError()
+    def __str__(self):
+        fmt = '| {key:10} | {ts:10d} | {value:10.2f} |'
+        return fmt.format(key=self.key, ts=self.timestamp, value=self.value)
 class Response:
     def __init__(self, response):
+        #import pdb; pdb.set_trace()
         response_splited = response.split('\n')
         if len(response_splited) < 3:
             raise ResponseError()
@@ -110,6 +115,7 @@ class Response:
         self.status = self.check_status(status)
         self.msg = None
         self.metrics = None
+        
         if self.status:
             data_lines = response_splited[1:]
             self.metrics = self.parse_data(data_lines)
@@ -128,12 +134,57 @@ class Response:
         return metrics
 
 class Client:
-    def __init__(self, ip='127.0.0.1', port='8888', timeout=15): pass
+    def __init__(self, ip='127.0.0.1', port=8888, timeout=15):
+        self.server_ip = ip
+        self.port = port
+        self.timeout = timeout
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout)
+    def put(self, key, value, timestamp): 
+        put_cmd = PutCmd(key, value, timestamp)
+        with closing(self._connect()):
+            self.sock.sendall(str(put_cmd).encode())
+    def _send_recv(self, request):
+        response = bytearray()
+        end_symb = '\n\n'.encode()
+        buf_size = 4096
+        with closing(self._connect()):
+            try:
+                self.sock.sendall(request)
+                
+                chunk = self.sock.recv(buf_size)
+                response.extend(chunk)
+                while chunk[-2:] != end_symb:
+                    chunk = self.sock.recv(buf_size)
+                    response.extend(chunk)
+            except socket.timeout:
+                raise ClientError('Exceed timeout on send')
+        return response
 
-    def put(self, key, value, timestamp): pass
-    def get(self, key): pass
+    def get(self, key): 
+        get_cmd = GetCmd(key)
+        response = self._send_recv(str(get_cmd).encode())
+        response_obj = Response(response.decode())
+        if not response_obj.status:
+            raise ClientError(response_obj.msg)
+        metrics_dict = dict()
 
-    def _buld_get(self, key, value, timestamp): pass
-    def _build_put(self, key): pass
+        #import pdb; pdb.set_trace()
+        for metric in response_obj.metrics:
+            
+            metric_instance = (metric.timestamp, metric.value)
+            if metric.key in metrics_dict:
+                metrics_dict[metric.key] = metrics_dict[metric.key].append(metric_instance)
+            else:
+                metrics_dict[metric.key] = [metric_instance]
+        return metrics_dict
+
+
+    def _connect(self): 
+        try:
+            self.sock.connect((self.server_ip, self.port))
+        except socket.timeout:
+            raise ClientError('Exceed timeout on connect')
+        return self.sock
 
 
