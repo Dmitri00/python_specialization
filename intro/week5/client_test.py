@@ -14,12 +14,12 @@ class ClientTest(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
     #@patch('socket.socket')
-    def test_get_cmd_bad_key(self):
-        bad_keys = ['cpucpu', 'cpu cpu', 'cpu.cpu.cpu', None ]
+    def test_get_cmd_bad_str_key(self):
+        bad_keys = ['cpucpu', 'cpu cpu', 'cpu.cpu.cpu']
         client = Client()
         for bad_key in bad_keys:
-            with self.assertRaises(ClientError):
-                client.get(bad_key)
+            metrics = client.get(bad_key)
+            self.assertTrue(metrics == {})
     #@patch('socket.socket')
     def test_get_cmd_good_key(self):
         keys = ['cpu.usage', 'cpu.temp', 'mem.usage', '*']
@@ -41,7 +41,7 @@ class ClientTest(unittest.TestCase):
     #@patch('socket.socket')
     def test_put_cmd_bad_timestamp(self):
         key = 'cpu.cpu'
-        bad_stamps = [-100, -1, 0, None]
+        bad_stamps = [-100, -1, 0]
         value = 2
         client = Client()
         for bad_stamp in bad_stamps:
@@ -94,7 +94,7 @@ class ClientTest(unittest.TestCase):
         key = 'cpu.cpu'
         value = 54.0
         timestamp = 5435433
-        cmd_bytes = 'put {} {:} {:d}\n'.format(key, str(value), timestamp).encode()
+        cmd_bytes = 'put {} {:} {:d}\n'.format(key, '{:g}'.format(value), timestamp).encode()
         client = Client()
         
         #import pdb; pdb.set_trace()
@@ -108,6 +108,20 @@ class ClientTest(unittest.TestCase):
         call_args = sock_instance.sendall.call_args_list[first_call][positional_args]
         sended_str = call_args[0]
         self.assertTrue(cmd_bytes == sended_str)
+    def test_get_parses_empty_metrics(self):
+        key = '*'
+        client = Client()
+
+        
+        server_response = 'ok\n\n'.encode()
+        sock_instance = self.MockClass.return_value
+        sock_instance.recv = unittest.mock.Mock(return_value=server_response)
+
+        metrics_expected = {}
+        
+        #import pdb; pdb.set_trace()
+        metrics_received = client.get(key)
+        self.assertTrue(metrics_expected == metrics_received)
     def test_get_parses_metrics(self):
         key = '*'
         client = Client()
@@ -122,6 +136,29 @@ class ClientTest(unittest.TestCase):
         #import pdb; pdb.set_trace()
         metrics_received = client.get(key)
         self.assertTrue(metrics_expected == metrics_received)
+
+
+    def test_get_parses_metrics2(self):
+        key = '*'
+        client = Client()
+
+        
+        server_response = 'ok\npalm.cpu 10.5 1501864247\neardrum.cpu 15.3 1501864259\npalm.cpu 8.3 1501864340\neardrum.memory 200 1501861111\n\n'.encode()
+        sock_instance = self.MockClass.return_value
+        sock_instance.recv = unittest.mock.Mock(return_value=server_response)
+
+        metrics_expected = {'palm.cpu': [
+                                (1501864247, 10.5), 
+                                (1501864340, 8.3)], 
+                            'eardrum.memory': [(1501861111, 200)],
+                            'eardrum.cpu': [(1501864259, 15.3)]
+                            }
+        
+        #import pdb; pdb.set_trace()
+
+        metrics_received = client.get(key)
+        self.assertTrue(metrics_expected == metrics_received)
+        
 
 if __name__ == '__main__':
     unittest.main()
