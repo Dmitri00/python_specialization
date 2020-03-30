@@ -41,6 +41,7 @@ class ClientServerProtocol(asyncio.Protocol):
             return self.send_error()
         except ProtocolError:
             return self.send_error()
+
     def process_get(self, client_request):
         key = client_request.key
         
@@ -48,29 +49,47 @@ class ClientServerProtocol(asyncio.Protocol):
             data = self.metrics_db[key]
         elif key == '*':
             data = self.metrics_db
-        return str(data)
-    
+        else:
+            data = []
+        is_ok = True
+        return Response(is_ok, data)
+    def process_put(self, put_cmd):
+        
+        if put_cmd.key in self.metrics_db:
+            metrics_array = self.metrics_db[put_cmd.key]
+            insert_pos = bisect(metrics_array, put_cmd.timestamp)
+            value_col = 0
+            timestamp_col = 1
+            
+            if metrics_array[insert_pos][timestamp_col] == put_cmd.timestamp:
+                metrics_array[insert_pos][value_col] = put_cmd.value
+            else:
+                metrics_array.insert(insert_pos, [put_cmd.value, put_cmd.timestamp])
+        else:
+            self.metrics_db[put_cmd.key] = [[put_cmd.value, put_cmd.timestamp]]
+        is_ok = True
+        empty_data = []
+        return Response(is_ok, empty_data)
+    def send_error(self):
+        is_ok = False
+        empty_data = []
+        error_msg = 'wrong command'
+        return Response(is_ok, empty_data, error_msg)
+        
         
 
 
 
-        
-        
-
-
-loop = asyncio.get_event_loop()
-coro = loop.create_server(
-    ClientServerProtocol,
-    '127.0.0.1', 8181
-)
-
-server = loop.run_until_complete(coro)
-
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    pass
-
-server.close()
-loop.run_until_complete(server.wait_closed())
-loop.close()
+def run_server(host, port):
+    loop = asyncio.get_event_loop()
+    coro = loop.create_server(
+        ClientServerProtocol,
+        host, port
+    )
+    server = loop.run_until_complete(coro)
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        server.close()
+    loop.run_until_complete(server.wait_closed())
+    loop.close()
