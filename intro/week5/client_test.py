@@ -153,8 +153,6 @@ class ClientTest(unittest.TestCase):
                             'eardrum.memory': [(1501861111, 200)],
                             'eardrum.cpu': [(1501864259, 15.3)]
                             }
-        
-        #import pdb; pdb.set_trace()
 
         metrics_received = client.get(key)
         self.assertTrue(metrics_expected == metrics_received)

@@ -30,7 +30,7 @@ class Client:
             timestamp = int(time.time())
         put_cmd = PutCmd(key, value, timestamp)
         response = self._send_recv(put_cmd.encode())
-        response_obj = Response(response.decode())
+        response_obj = Response.from_str(response.decode())
         if not response_obj.status:
             raise ClientError(response_obj.msg)
     def _send_recv(self, request):
@@ -52,7 +52,7 @@ class Client:
     def get(self, key): 
         get_cmd = GetCmd(key)
         response = self._send_recv(get_cmd.encode())
-        response_obj = Response(response.decode())
+        response_obj = Response.from_str(response.decode())
         if not response_obj.status:
             raise ClientError(response_obj.msg)
         metrics_dict = dict()
