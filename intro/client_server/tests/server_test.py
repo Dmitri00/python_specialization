@@ -1,7 +1,7 @@
 import unittest
-from protocol_classes import Response, Metric, GetCmd, PutCmd, ClientError
-from client import Client
-from server import run_server
+from src.protocol_classes import Response, Metric, GetCmd, PutCmd, ClientError
+from src.client import Client
+from src.server import run_server
 import threading
 
 class ServerTest(unittest.TestCase):

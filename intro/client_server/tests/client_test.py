@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from client import Metric, Client, ClientError
+from src.client import Metric, Client, ClientError
 
 
 
