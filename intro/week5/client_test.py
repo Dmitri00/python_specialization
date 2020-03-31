@@ -94,7 +94,7 @@ class ClientTest(unittest.TestCase):
         key = 'cpu.cpu'
         value = 54.0
         timestamp = 5435433
-        cmd_bytes = 'put {} {:} {:d}\n'.format(key, '{:g}'.format(value), timestamp).encode()
+        cmd_bytes = 'put {} {:} {:d}\n'.format(key, str(value), timestamp).encode()
         client = Client()
         
         #import pdb; pdb.set_trace()
@@ -107,6 +107,7 @@ class ClientTest(unittest.TestCase):
         positional_args = 0
         call_args = sock_instance.sendall.call_args_list[first_call][positional_args]
         sended_str = call_args[0]
+        #import pdb; pdb.set_trace()
         self.assertTrue(cmd_bytes == sended_str)
     def test_get_parses_empty_metrics(self):
         key = '*'
