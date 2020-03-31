@@ -11,6 +11,7 @@ class GeneralCmd:
     KEY_DELIM = '.'
     CMD_FORMAT = '{name:} {data:}\n'
     cmd_name = ''
+    
     def check_str(self, key):
         if isinstance(key, str) and len(key) > 0:
             return key
@@ -21,14 +22,7 @@ class GeneralCmd:
     def check_key(self, key):
         """check that key is str"""
         key = self.check_str(key)
-        try:
-            key.index(self.KEY_DELIM)
-        except ValueError:
-            raise CmdArgumentError()
-        if key.count('.') > 1:
-            raise CmdArgumentError()
-        server, metric = key.split(self.KEY_DELIM)
-        if not server.isalnum() or not metric.isalnum():
+        if ' ' in key:
             raise CmdArgumentError()
         return key
     # 
@@ -63,7 +57,7 @@ class PutCmd(GeneralCmd):
     cmd_name = 'put'
     def __init__(self, key, value, timestamp):
         self.key = self.check_key(key)
-        self.value = '{:g}'.format(self.check_num(value))
+        self.value = self.check_num(value)
         self.timestamp = self.check_timestamp(timestamp)
     @classmethod
     def from_str(cls, cmd_data):
@@ -98,7 +92,7 @@ class PutCmd(GeneralCmd):
 class GetCmd(GeneralCmd):
     cmd_name = 'get'
     def __init__(self, key='*'):
-        self.key = self.check_str(key)
+        self.key = self.check_key(key)
     @classmethod
     def from_str(cls, cmd_data):
         return GetCmd(cmd_data)
@@ -115,25 +109,36 @@ class GetCmd(GeneralCmd):
         else:
             return True
 class Metric:
-    def __init__(self, data_line):
+    def __init__(self, key, value, timestamp):
+        self.key = key
+        self.value = value
+        self.timestamp = timestamp
+    @classmethod
+    def from_str(cls, data_line):
+        #import pdb; pdb.set_trace()
         data_line_splited = data_line.split(' ')
         if len(data_line_splited) != 3:
             raise ResponseError()
         try:
-            self.key = data_line_splited[0]
-            self.value = float(data_line_splited[1])
-            self.timestamp = int(data_line_splited[2])
+            key = data_line_splited[0]
+            value = float(data_line_splited[1])
+            timestamp = int(data_line_splited[2])
+            return cls(key, value, timestamp)
         except ValueError:
             raise ResponseError()
     def __str__(self):
-        fmt = '| {key:10} | {ts:10d} | {value:10.2f} |'
+        fmt = '| {key:10} | {value:10.2f} | {ts:10d} |'
         return fmt.format(key=self.key, ts=self.timestamp, value=self.value)
     def __repr__(self):
-        fmt = '{key} {ts:d} {value:g}'
-        return fmt.format(key=self.key, ts=self.timestamp, value=self.value)
+        # according to task, value of 1 should be represented as str '1.0'
+        # 4.654 - as '4.654'. str.format doesn't allow to format float this way in one line
+        # that's why firstly value is converted to str via float.__str__ method
+        fmt = '{key} {value:s} {ts:d}'
+        return fmt.format(key=self.key, ts=self.timestamp, value=str(self.value))
 class Response:
     RESPONSE_FORMAT = '{status}\n{data}\n\n'
-    def __init__(self, is_ok, metrics, error_msg=''):
+    OK_MSG = 'ok\n\n'
+    def __init__(self, is_ok, metrics, error_msg='wrong command'):
         self.status = is_ok
         if is_ok:
             self.metrics = metrics
@@ -175,15 +180,18 @@ class Response:
     @staticmethod
     def parse_data(data_lines):
         metrics = []
-        metrics.extend(list(map(Metric, data_lines)))
+        not_empty_lines = filter(lambda x: len(x) > 0, data_lines)
+        metrics.extend(list(map(Metric.from_str, not_empty_lines)))
         return metrics
     def __str__(self):
         if self.status:
-            status = 'ok'
-            data = '\n'.join(map(str, self.metrics))
+            status = 'ok'   
+            data = '\n'.join(map(repr, self.metrics))
         else:
             status = 'error'
             data = self.error_msg
+        if self.status and len(data) == 0:
+            return self.OK_MSG
         return self.RESPONSE_FORMAT.format(status=status, data=data)
     def encode(self):
         return str(self).encode()
