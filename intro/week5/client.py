@@ -32,7 +32,7 @@ class Client:
         response = self._send_recv(put_cmd.encode())
         response_obj = Response.from_str(response.decode())
         if not response_obj.status:
-            raise ClientError(response_obj.msg)
+            raise ClientError(response_obj.error_msg)
     def _send_recv(self, request):
         response = bytearray()
         end_symb = '\n\n'.encode()
@@ -54,7 +54,7 @@ class Client:
         response = self._send_recv(get_cmd.encode())
         response_obj = Response.from_str(response.decode())
         if not response_obj.status:
-            raise ClientError(response_obj.msg)
+            raise ClientError(response_obj.error_msg)
         metrics_dict = dict()
 
 
